@@ -10,9 +10,12 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -226,9 +229,7 @@ fun newtonMethod(
     return x
 }
 
-// Drawing functions
-@Composable
-fun CanvasScope.drawGraph(
+private fun DrawScope.drawGraph(
     points: List<Pair<Double, Double>>,
     chordRoot: Double,
     newtonRoot: Double,
@@ -242,84 +243,72 @@ fun CanvasScope.drawGraph(
     val maxY = points.maxOf { it.second }
     val yRange = maxY - minY
 
-    val width = size.width
-    val height = size.height
-
-    // Draw axes
-    val zeroX = if (minX <= 0.0 && maxX >= 0.0) {
-        (-minX) / (maxX - minX) * width
+    // Convert to Float for drawing
+    val zeroXFloat = if (minX <= 0.0 && maxX >= 0.0) {
+        ((-minX) / (maxX - minX) * size.width).toFloat()
     } else 0f
 
-    val zeroY = if (minY <= 0.0 && maxY >= 0.0) {
-        (1 - (0 - minY) / yRange) * height
-    } else height
+    val zeroYFloat = if (minY <= 0.0 && maxY >= 0.0) {
+        ((1 - (0 - minY) / yRange) * size.height).toFloat()
+    } else size.height
 
+    // Draw axes
     drawLine(
         color = Color.Black,
-        start = Offset(zeroX, 0f),
-        end = Offset(zeroX, height),
+        start = Offset(zeroXFloat, 0f),
+        end = Offset(zeroXFloat, size.height),
         strokeWidth = 2f
     )
 
     drawLine(
         color = Color.Black,
-        start = Offset(0f, zeroY),
-        end = Offset(width, zeroY),
+        start = Offset(0f, zeroYFloat),
+        end = Offset(size.width, zeroYFloat),
         strokeWidth = 2f
     )
 
-    // Draw grid and labels
+    // Draw grid
     for (i in 1..5) {
-        val xPos = (i * width / 5)
-        val xVal = minX + i * (maxX - minX) / 5
+        val xPos = (i * size.width / 5).toFloat()
         drawLine(
             color = Color.LightGray,
             start = Offset(xPos, 0f),
-            end = Offset(xPos, height),
+            end = Offset(xPos, size.height),
             strokeWidth = 1f
-        )
-        drawContext.canvas.nativeCanvas.drawText(
-            "%.1f".format(xVal),
-            xPos,
-            zeroY + 15,
-            android.graphics.Paint().apply {
-                color = android.graphics.Color.BLACK
-                textSize = 24f
-            }
         )
     }
 
     // Draw function plot
     for (i in 0 until points.size - 1) {
-        val x1 = (points[i].first - minX) / (maxX - minX) * width
-        val y1 = height - (points[i].second - minY) / yRange * height
-        val x2 = (points[i+1].first - minX) / (maxX - minX) * width
-        val y2 = height - (points[i+1].second - minY) / yRange * height
+        val x1 = ((points[i].first - minX) / (maxX - minX) * size.width).toFloat()
+        val y1 = (size.height - (points[i].second - minY) / yRange * size.height).toFloat()
+        val x2 = ((points[i+1].first - minX) / (maxX - minX) * size.width).toFloat()
+        val y2 = (size.height - (points[i+1].second - minY) / yRange * size.height).toFloat()
 
         drawLine(
             color = Color.Blue,
-            start = Offset(x1.toFloat(), y1.toFloat()),
-            end = Offset(x2.toFloat(), y2.toFloat()),
+            start = Offset(x1, y1),
+            end = Offset(x2, y2),
             strokeWidth = 2f
         )
     }
 
     // Draw roots
-    val rootX = (chordRoot - minX) / (maxX - minX) * width
-    val rootY = height - (f(chordRoot, 1.0, 1.0) - minY) / yRange * height
+    val rootX = ((chordRoot - minX) / (maxX - minX) * size.width).toFloat()
+    val rootY = (size.height - (f(chordRoot, 1.0, 1.0) - minY) / yRange * size.height).toFloat()
     drawCircle(
         color = Color.Red,
         radius = 8f,
-        center = Offset(rootX.toFloat(), rootY.toFloat()),
+        center = Offset(rootX, rootY),
         style = Stroke(width = 2f)
     )
 
-    val newtonX = (newtonRoot - minX) / (maxX - minX) * width
-    val newtonY = height - (f(newtonRoot, 1.0, 1.0) - minY) / yRange * height
+    val newtonX = ((newtonRoot - minX) / (maxX - minX) * size.width).toFloat()
+    val newtonY = (size.height - (f(newtonRoot, 1.0, 1.0) - minY) / yRange * size.height).toFloat()
     drawCircle(
         color = Color.Green,
         radius = 8f,
-        center = Offset(newtonX.toFloat(), newtonY.toFloat()),
+        center = Offset(newtonX, newtonY),
         style = Stroke(width = 2f)
     )
 }

@@ -17,7 +17,9 @@ repositories {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.lets-plot:lets-plot-common:4.0.0")
+    implementation("org.jetbrains.lets-plot:lets-plot-compose:1.0.0")
+    implementation("org.jetbrains.lets-plot:lets-plot-kotlin:4.0.0")
 }
 
 compose.desktop {
