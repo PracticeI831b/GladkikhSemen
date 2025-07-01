@@ -17,9 +17,9 @@ repositories {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.lets-plot:lets-plot-common:4.0.0")
-    implementation("org.jetbrains.lets-plot:lets-plot-compose:1.0.0")
-    implementation("org.jetbrains.lets-plot:lets-plot-kotlin:4.0.0")
+    implementation("org.jetbrains.lets-plot:lets-plot-common:2.2.0")
+    implementation("org.jetbrains.lets-plot:lets-plot-compose:2.2.1")
+    implementation("org.jetbrains.lets-plot:lets-plot-kotlin:4.10.0")
 }
 
 compose.desktop {
@@ -27,7 +27,7 @@ compose.desktop {
         mainClass = "MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Exe)
             packageName = "task6"
             packageVersion = "1.0.0"
         }
