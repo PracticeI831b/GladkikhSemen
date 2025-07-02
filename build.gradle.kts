@@ -23,10 +23,9 @@ dependencies {
     implementation("org.jetbrains.lets-plot:lets-plot-compose:2.2.1")
     implementation("org.jetbrains.lets-plot:lets-plot-kotlin-jvm:4.10.0")
     implementation("org.jetbrains.lets-plot:platf-awt:4.5.2")
-    // Библиотека для работы с SVG
-    implementation("com.github.jiconfont:jiconfont-swing:1.0.0")
-    implementation("com.github.jiconfont:jiconfont-font_awesome:4.7.0.1")
     implementation("org.slf4j:slf4j-simple:2.0.12")
+
+    implementation("androidx.compose.material:material-icons-extended:1.7.6")
 }
 compose.desktop {
     application {
