@@ -53,6 +53,7 @@ fun App() {
     var newtonRoot by remember { mutableStateOf<Double?>(null) }
     var chordIterations by remember { mutableStateOf(0) }
     var newtonIterations by remember { mutableStateOf(0) }
+    var rootsTooClose by remember { mutableStateOf(false) }
 
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -81,7 +82,7 @@ fun App() {
     }
 
     fun f(x: Double, aVal: Double, bVal: Double): Double? {
-        if (x <= 0) return null
+        if (x < 0) return null
         return try {
             sqrt(aVal * x) - cos(bVal * x)
         } catch (e: Exception) {
@@ -113,10 +114,16 @@ fun App() {
         val maxIterations = 1000
         var c: Double
         var fc: Double?
+        var prevC = Double.MAX_VALUE
 
         do {
             c = (a * fb - b * fa) / (fb - fa)
             fc = f(c, aVal, bVal) ?: return null to 0
+
+            // Проверка изменения аргумента и значения функции
+            if (abs(fc) < eps && abs(c - prevC) < eps) {
+                return c to iterations
+            }
 
             if (fa * fc < 0) {
                 b = c
@@ -126,30 +133,42 @@ fun App() {
                 fa = fc
             }
 
+            prevC = c
             iterations++
-        } while (abs(fc) > eps && iterations < maxIterations)
+        } while (iterations < maxIterations)
 
-        return if (iterations < maxIterations) c to iterations else null to 0
+        return if (abs(fc ?: Double.MAX_VALUE) < eps) c to iterations else null to 0
     }
 
     fun newtonMethod(x0: Double, aVal: Double, bVal: Double, eps: Double = 0.001): Pair<Double?, Int> {
-        var x = max(x0, 1e-5)
+        var x = max(x0, 1e-10)  // Увеличим точность
         var iterations = 0
         val maxIterations = 1000
         var delta: Double
+        var prevX = Double.MAX_VALUE
 
         do {
             val fx = f(x, aVal, bVal) ?: return null to 0
             val dfx = df(x, aVal, bVal) ?: return null to 0
 
-            if (abs(dfx) < 1e-10) return null to 0
+            if (abs(dfx) < 1e-15) return null to 0  // Более строгая проверка
 
             delta = fx / dfx
             x -= delta
             iterations++
-        } while (abs(delta) > eps && iterations < maxIterations)
 
-        return if (iterations < maxIterations) x to iterations else null to 0
+            // Двойной критерий остановки
+            if (abs(delta) < eps && abs(fx) < eps) {
+                return x to iterations
+            }
+
+            // Защита от зацикливания
+            if (abs(x - prevX) < 1e-15) break
+
+            prevX = x
+        } while (iterations < maxIterations)
+
+        return if (abs(f(x, aVal, bVal) ?: Double.MAX_VALUE) < eps) x to iterations else null to 0
     }
 
     fun plotFunction() {
@@ -180,7 +199,7 @@ fun App() {
             }
 
             val maxXForSearch = min(10.0 * PI / abs(bVal), 100.0)
-            val coarsePoints = 100
+            val coarsePoints = 1000
             val coarseXValues = mutableListOf<Double>()
             val coarseYValues = mutableListOf<Double>()
 
@@ -241,6 +260,10 @@ fun App() {
                 return
             }
 
+            // После вычисления корней проверяем их близость
+            val diff = abs(chordRoot!! - newtonRoot!!)
+            rootsTooClose = diff < 0.001  // Порог близости = точности вычислений
+
             // Общий график
             val fullPlotData = mapOf("x" to coarseXValues, "y" to coarseYValues)
             fullPlot = createPlot(
@@ -254,13 +277,15 @@ fun App() {
                 newtonInitial
             )
 
-            // Увеличенный график с динамической подстройкой отступа
+            // Динамическое масштабирование для увеличенного графика
             val minRoot = min(chordRoot ?: 0.0, newtonRoot ?: 0.0)
             val maxRoot = max(chordRoot ?: 0.0, newtonRoot ?: 0.0)
             val range = maxRoot - minRoot
-            val padding = if (range > 0) range * 1.5 else 2.0
+            // Адаптивный padding в зависимости от размера корня
+            val padding = if (minRoot > 0.1) 0.1 else min(0.05, minRoot * 0.5)
             val viewMinX = max(0.0, minRoot - padding)
             val viewMaxX = maxRoot + padding
+
 
             val points = 500
             val xValues = mutableListOf<Double>()
@@ -406,6 +431,17 @@ fun App() {
                         newtonInitial?.let {
                             Text("Начальное приближение Ньютона: ${"%.5f".format(it)}")
                         }
+
+                        // Добавляем предупреждение о близких корнях
+                        if (rootsTooClose) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Примечание: корни методов очень близки (разница: ${"%.6f".format(abs(chordRoot!! - newtonRoot!!))}), " +
+                                        "точки на графике могут перекрывать друг друга",
+                                color = Color(0xFFFF9800), // Оранжевый цвет для предупреждения
+                                style = MaterialTheme.typography.caption
+                            )
+                        }
                     }
                 }
             }
@@ -477,6 +513,22 @@ fun App() {
                                 )
                             }
                         }
+
+                        // Добавляем предупреждение над графиком
+                        if (rootsTooClose) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Корни методов очень близки - точки могут перекрываться",
+                                    color = Color.Red,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             } else {
@@ -522,18 +574,8 @@ private fun createPlot(
     // Желтые пунктирные линии интервала метода хорд
     chordInterval?.let { (left, right) ->
         plot = plot +
-                geomVLine(
-                    xintercept = left,
-                    color = "#FFA000",
-                    linetype = "dashed",
-                    size = 1.0
-                ) {} +
-                geomVLine(
-                    xintercept = right,
-                    color = "#FFA000",
-                    linetype = "dashed",
-                    size = 1.0
-                ) {}
+                geomVLine(xintercept = left, color = "#FFA000", linetype = "dashed", size = 1.0) +
+                geomVLine(xintercept = right, color = "#FFA000", linetype = "dashed", size = 1.0)
     }
 
     // Создаем данные для точек корней и легенды
@@ -559,6 +601,18 @@ private fun createPlot(
         }
     }
 
+    // Определяем, насколько близки корни
+    val rootsAreClose = if (chordRoot != null && newtonRoot != null) {
+        abs(chordRoot - newtonRoot) < 0.001
+    } else {
+        false
+    }
+
+    // Если корни близки, увеличиваем размер точек и делаем их полупрозрачными
+    val pointSize = if (rootsAreClose) 6.0 else 4.5
+    val pointAlpha = if (rootsAreClose) 0.7 else 1.0
+
+
     // Если есть корни, добавляем их на график
     if (rootPoints.isNotEmpty()) {
         val pointsData = mapOf(
@@ -571,7 +625,8 @@ private fun createPlot(
         plot = plot +
                 geomPoint(
                     data = pointsData,
-                    size = 4.5
+                    size = pointSize,
+                    alpha = pointAlpha
                 ) {
                     x = "x"
                     y = "y"
