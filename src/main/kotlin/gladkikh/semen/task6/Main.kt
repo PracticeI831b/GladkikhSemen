@@ -1,3 +1,5 @@
+package gladkikh.semen.task6
+
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
@@ -16,8 +18,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import org.jetbrains.letsPlot.Figure
-import org.jetbrains.letsPlot.core.plot.base.Aes
-import org.jetbrains.letsPlot.core.spec.Option
 import org.jetbrains.letsPlot.geom.geomLine
 import org.jetbrains.letsPlot.geom.geomPoint
 import org.jetbrains.letsPlot.geom.geomHLine
@@ -25,12 +25,13 @@ import org.jetbrains.letsPlot.geom.geomVLine
 import org.jetbrains.letsPlot.ggsize
 import org.jetbrains.letsPlot.ggplot
 import org.jetbrains.letsPlot.label.ggtitle
-import org.jetbrains.letsPlot.letsPlot
 import org.jetbrains.letsPlot.scale.scaleColorManual
 import org.jetbrains.letsPlot.scale.scaleXContinuous
 import org.jetbrains.letsPlot.scale.scaleYContinuous
 import org.jetbrains.letsPlot.skia.compose.PlotPanel
 import kotlin.math.*
+
+// Точка входа
 
 fun main() = application {
     System.setProperty("java.awt.headless", "false")
@@ -272,7 +273,7 @@ fun App() {
                 newtonRoot,
                 aVal,
                 bVal,
-                "f(x) = √(${aVal}x) - cos(${bVal}x) (общий вид)",
+                "gladkikh.semen.task6.f(x) = √(${aVal}x) - cos(${bVal}x) (общий вид)",
                 chordInterval,
                 newtonInitial
             )
@@ -307,7 +308,7 @@ fun App() {
                 newtonRoot,
                 aVal,
                 bVal,
-                "f(x) = √(${aVal}x) - cos(${bVal}x) (увеличенный вид)",
+                "gladkikh.semen.task6.f(x) = √(${aVal}x) - cos(${bVal}x) (увеличенный вид)",
                 chordInterval,
                 newtonInitial
             )
@@ -610,7 +611,7 @@ private fun createPlot(
 
     // Если корни близки, увеличиваем размер точек и делаем их полупрозрачными
     val pointSize = if (rootsAreClose) 6.0 else 4.5
-    val pointAlpha = if (rootsAreClose) 0.7 else 1.0
+    val pointAlpha = if (rootsAreClose) 0.5 else 1.0
 
 
     // Если есть корни, добавляем их на график
