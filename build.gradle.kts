@@ -27,12 +27,16 @@ dependencies {
 }
 compose.desktop {
     application {
-        mainClass = "gladkikh.semen.task6.MainKt"
+        mainClass = "MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Exe)
             packageName = "EquationSolver"
-            packageVersion = "1.0.0"
+            packageVersion = "1.1.0"
+
+            windows {
+                iconFile.set(project.file("icons/gorilla.ico"))
+            }
         }
     }
 }

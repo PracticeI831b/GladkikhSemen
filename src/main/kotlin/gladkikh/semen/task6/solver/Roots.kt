@@ -2,6 +2,8 @@ package gladkikh.semen.task6.solver
 
 // Алгоритмы поиска корней
 
+import gladkikh.semen.task6.solver.Equation.df
+import gladkikh.semen.task6.solver.Equation.f
 import kotlin.math.*
 import gladkikh.semen.task6.ui.Plotter.createPlot
 import org.jetbrains.letsPlot.Figure
@@ -66,8 +68,8 @@ fun computeRoots(
         }
 
         // Расчет значений функций в найденных корнях
-        val fValueChord = Equation.f(chordResult.first!!, aVal, bVal)
-        val fValueNewton = Equation.f(newtonResult.first!!, aVal, bVal)
+        val fValueChord = f(chordResult.first!!, aVal, bVal)
+        val fValueNewton = f(newtonResult.first!!, aVal, bVal)
 
         // Проверка близости корней
         val rootDifference = abs(chordResult.first!! - newtonResult.first!!)
@@ -128,19 +130,32 @@ private fun findRootInterval(
     var rootEstimate: Double? = null
     var chordInterval: Pair<Double, Double>? = null
 
+    // Сначала собираем все точки
     for (i in 0 until points) {
         val x = i * maxX / points
         val y = Equation.f(x, aVal, bVal)
         if (y != null) {
             xValues.add(x)
             yValues.add(y)
+        }
+    }
 
-            // Поиск смены знака (признак корня)
-            if (i > 0 && yValues[i-1] * y < 0) {
-                rootEstimate = (xValues[i-1] + x) / 2
-                chordInterval = xValues[i-1] to x
-                break
-            }
+    if (xValues.isEmpty()) {
+        return SearchResult(
+            coarseData = emptyMap(),
+            rootEstimate = null,
+            chordInterval = null
+        )
+    }
+
+    // Затем ищем первый интервал смены знака
+    for (i in 1 until xValues.size) {
+        val y1 = yValues[i-1]
+        val y2 = yValues[i]
+        if (y1 * y2 <= 0) {
+            rootEstimate = (xValues[i-1] + xValues[i]) / 2
+            chordInterval = xValues[i-1] to xValues[i]
+            break
         }
     }
 
@@ -169,8 +184,8 @@ fun chordMethod(
     var a = x0
     var b = x1
 
-    var fa = Equation.f(a, aVal, bVal) ?: return null to 0
-    var fb = Equation.f(b, aVal, bVal) ?: return null to 0
+    var fa = f(a, aVal, bVal) ?: return null to 0
+    var fb = f(b, aVal, bVal) ?: return null to 0
 
     if (fa * fb > 0) return null to 0
 
@@ -182,7 +197,7 @@ fun chordMethod(
 
     do {
         c = (a * fb - b * fa) / (fb - fa)
-        fc = Equation.f(c, aVal, bVal) ?: return null to 0
+        fc = f(c, aVal, bVal) ?: return null to 0
 
         // Критерии остановки
         if (abs(fc) < eps && abs(c - prevC) < eps) {
@@ -218,8 +233,8 @@ fun newtonMethod(
     var prevX = Double.MAX_VALUE
 
     do {
-        val fx = Equation.f(x, aVal, bVal) ?: return null to 0
-        val dfx = Equation.df(x, aVal, bVal) ?: return null to 0
+        val fx = f(x, aVal, bVal) ?: return null to 0
+        val dfx = df(x, aVal, bVal) ?: return null to 0
 
         if (abs(dfx) < 1e-15) return null to 0
 
@@ -236,26 +251,21 @@ fun newtonMethod(
         prevX = x
     } while (iterations < maxIterations)
 
-    return if (abs(Equation.f(x, aVal, bVal) ?: Double.MAX_VALUE) < eps)
+    return if (abs(f(x, aVal, bVal) ?: Double.MAX_VALUE) < eps)
         x to iterations else null to 0
 }
 
-// Создание увеличенного графика (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// Создание увеличенного графика
 private fun createZoomedPlot(
-    chordRoot: Double,
-    newtonRoot: Double,
+    minRoot: Double,
+    maxRoot: Double,
     aVal: Double,
     bVal: Double,
-    chordRootPt: Double?,
-    newtonRootPt: Double?,
+    chordRoot: Double?,
+    newtonRoot: Double?,
     chordInterval: Pair<Double, Double>?,
     newtonInitial: Double?
 ): Figure? {
-    val minRoot = min(chordRoot, newtonRoot)
-    val maxRoot = max(chordRoot, newtonRoot)
-    val range = maxRoot - minRoot
-
-    // Адаптивный padding в зависимости от размера корня
     val padding = if (minRoot > 0.1) 0.1 else min(0.05, minRoot * 0.5)
     val viewMinX = max(0.0, minRoot - padding)
     val viewMaxX = maxRoot + padding
@@ -266,7 +276,7 @@ private fun createZoomedPlot(
 
     for (i in 0 until points) {
         val x = viewMinX + i * (viewMaxX - viewMinX) / points
-        val y = Equation.f(x, aVal, bVal)
+        val y = f(x, aVal, bVal)
         if (y != null) {
             xValues.add(x)
             yValues.add(y)
@@ -275,8 +285,8 @@ private fun createZoomedPlot(
 
     return createPlot(
         data = mapOf("x" to xValues, "y" to yValues),
-        chordRoot = chordRootPt,
-        newtonRoot = newtonRootPt,
+        chordRoot = chordRoot,
+        newtonRoot = newtonRoot,
         aVal = aVal,
         bVal = bVal,
         title = "f(x) = √(${aVal}x) - cos(${bVal}x) (увеличенный вид)",
