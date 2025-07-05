@@ -1,6 +1,7 @@
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import gladkikh.semen.task6.ui.App
+import java.awt.Toolkit
 
 fun main() = application {
     System.setProperty("java.awt.headless", "false")

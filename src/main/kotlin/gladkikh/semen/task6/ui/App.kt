@@ -3,11 +3,16 @@ package gladkikh.semen.task6.ui
 // Основной UI компонент
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Calculate
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
+//import androidx.compose.material.icons.filled.Calculate
+//import androidx.compose.material.icons.filled.ZoomIn
+//import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import gladkikh.semen.task6.solver.RootResult
 import gladkikh.semen.task6.solver.computeRoots
 import org.jetbrains.letsPlot.Figure
-import kotlin.math.abs
 
 @Composable
 fun App() {
@@ -73,7 +77,7 @@ fun App() {
                     results = null
                     computeRoots(a, b) { result, error ->
                         results = result
-                        errorMessage = error ?: ""
+                        errorMessage = error
                         isLoading = false
                     }
                 }
@@ -91,9 +95,7 @@ fun App() {
             // Отображение результатов
             results?.let { rootResult ->
                 ResultsCard(
-                    rootResult = rootResult,
-                    a = a.replace(',', '.'),
-                    b = b.replace(',', '.')
+                    rootResult = rootResult
                 )
             }
 
@@ -168,7 +170,7 @@ private fun InputPanel(
                     strokeWidth = 2.dp
                 )
             } else {
-                Icon(Icons.Default.Calculate, contentDescription = null)
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text("Вычислить")
@@ -178,16 +180,21 @@ private fun InputPanel(
 
 @Composable
 private fun ResultsCard(
-    rootResult: RootResult,
-    a: String,
-    b: String
+    rootResult: RootResult
 ) {
     Card(
         elevation = 4.dp,
         backgroundColor = MaterialTheme.colors.surface,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 300.dp) // Ограничиваем высоту
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        val scrollState = rememberScrollState()
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .verticalScroll(scrollState) // Добавляем прокрутку
+        ) {
             Text(
                 text = "Результаты вычислений:",
                 fontWeight = FontWeight.Bold,
@@ -195,39 +202,43 @@ private fun ResultsCard(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Результаты метода хорд
-            Text("Корень методом хорд: ${"%.5f".format(rootResult.chordRoot)} (итераций: ${rootResult.chordIterations})")
-            rootResult.chordRoot?.let {
-                Text("Значение функции: ${"%.7f".format(rootResult.fValueChord ?: "N/A")}")
-            }
-
+            // Информация о количестве корней
+            Text("Найдено корней: ${rootResult.allRoots.size}")
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Результаты метода Ньютона
-            Text("Корень методом касательных: ${"%.5f".format(rootResult.newtonRoot)} (итераций: ${rootResult.newtonIterations})")
-            rootResult.newtonRoot?.let {
-                Text("Значение функции: ${"%.7f".format(rootResult.fValueNewton ?: "N/A")}")
-            }
+            // Результаты для каждого корня
+            rootResult.chordRoots.forEachIndexed { index, root ->
+                Text("Корень #${index + 1}:")
+                Text("  Метод хорд: ${"%.5f".format(root)} (итераций: ${rootResult.chordIterations.getOrNull(index)})")
+                rootResult.fValuesChord.getOrNull(index)?.let {
+                    Text("  Значение функции: ${"%.7f".format(it)}")
+                }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                rootResult.newtonRoots.getOrNull(index)?.let { newtonRoot ->
+                    Text("  Метод касательных: ${"%.5f".format(newtonRoot)} (итераций: ${rootResult.newtonIterations.getOrNull(index)})")
+                    rootResult.fValuesNewton.getOrNull(index)?.let {
+                        Text("  Значение функции: ${"%.7f".format(it)}")
+                    }
+                }
 
-            // Дополнительная информация
-            rootResult.chordInterval?.let {
-                Text("Интервал для метода хорд: [${"%.5f".format(it.first)}, ${"%.5f".format(it.second)}]")
-            }
-            rootResult.newtonInitial?.let {
-                Text("Начальное приближение Ньютона: ${"%.5f".format(it)}")
-            }
+                rootResult.chordIntervals.getOrNull(index)?.let {
+                    Text("  Интервал для хорд: [${"%.5f".format(it.first)}, ${"%.5f".format(it.second)}]")
+                }
 
-            // Предупреждение о близких корнях
-            if (rootResult.rootsTooClose) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Примечание: корни методов очень близки (разница: ${"%.6f".format(rootResult.rootDifference)}), " +
-                            "точки на графике могут перекрывать друг друга",
-                    color = Color(0xFFFF9800),
-                    style = MaterialTheme.typography.caption
-                )
+                rootResult.newtonInitials.getOrNull(index)?.let {
+                    Text("  Начальное приближение Ньютона: ${"%.5f".format(it)}")
+                }
+
+                // Предупреждение о близких корнях для этой пары
+                if (index < rootResult.rootsTooClose.size && rootResult.rootsTooClose[index]) {
+                    Text(
+                        text = "  Примечание: корни методов очень близки (разница: ${"%.6f".format(rootResult.rootDifferences[index])})",
+                        color = Color(0xFFFF9800),
+                        style = MaterialTheme.typography.caption
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
@@ -254,7 +265,7 @@ private fun GraphControls(
             modifier = Modifier.size(48.dp)
         ) {
             Icon(
-                imageVector = if (isZoomed) Icons.Default.ZoomOut else Icons.Default.ZoomIn,
+                imageVector = if (isZoomed) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 contentDescription = if (isZoomed) "Общий вид" else "Увеличенный вид",
                 tint = MaterialTheme.colors.primary
             )
@@ -284,7 +295,7 @@ private fun GraphArea(
             results == null -> Placeholder("Введите параметры и нажмите 'Вычислить'")
             else -> PlotDisplay(
                 plot = if (isZoomed) results.zoomedPlot else results.fullPlot,
-                showWarning = results.rootsTooClose
+                rootResult = results
             )
         }
     }
@@ -317,15 +328,16 @@ private fun Placeholder(text: String) {
 }
 
 @Composable
-private fun PlotDisplay(plot: Figure?, showWarning: Boolean) {
+private fun PlotDisplay(plot: Figure?, rootResult: RootResult?) {
     if (plot == null) {
         Placeholder("График не доступен")
     } else {
         Box(modifier = Modifier.fillMaxSize()) {
             Plotter.PlotPanel(figure = plot)
 
-            if (showWarning) {
-                WarningBanner("Корни методов очень близки - точки могут перекрываться")
+            // Общее предупреждение если есть близкие корни
+            if (rootResult?.rootsTooClose?.any { it } == true) {
+                WarningBanner("Некоторые корни методов очень близки - точки могут перекрываться")
             }
         }
     }

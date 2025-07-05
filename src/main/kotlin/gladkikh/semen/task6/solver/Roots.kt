@@ -8,23 +8,24 @@ import kotlin.math.*
 import gladkikh.semen.task6.ui.Plotter.createPlot
 import org.jetbrains.letsPlot.Figure
 
-// Результаты вычислений
+// Обновленная структура результатов
 data class RootResult(
-    val chordRoot: Double?,
-    val newtonRoot: Double?,
-    val chordIterations: Int,
-    val newtonIterations: Int,
-    val chordInterval: Pair<Double, Double>?,
-    val newtonInitial: Double?,
+    val chordRoots: List<Double>,          // Все корни методом хорд
+    val newtonRoots: List<Double>,         // Все корни методом Ньютона
+    val chordIterations: List<Int>,        // Итерации для каждого корня (хорды)
+    val newtonIterations: List<Int>,       // Итерации для каждого корня (Ньютона)
+    val chordIntervals: List<Pair<Double, Double>>,
+    val newtonInitials: List<Double>,
     val fullPlot: Figure?,
     val zoomedPlot: Figure?,
-    val fValueChord: Double?,
-    val fValueNewton: Double?,
-    val rootsTooClose: Boolean,
-    val rootDifference: Double
+    val fValuesChord: List<Double?>,
+    val fValuesNewton: List<Double?>,
+    val allRoots: List<Double>,             // Все найденные корни
+    val rootsTooClose: List<Boolean>,
+    val rootDifferences: List<Double>
 )
 
-// Основная функция вычисления корней
+// Основная функция вычисления корней (обновленная)
 fun computeRoots(
     a: String,
     b: String,
@@ -47,79 +48,117 @@ fun computeRoots(
             return
         }
 
-        // Поиск интервала с корнем
+        // Поиск ВСЕХ интервалов с корнями
         val maxXForSearch = min(10.0 * PI / abs(bVal), 100.0)
-        val searchResult = findRootInterval(aVal, bVal, maxXForSearch)
-        val rootEstimate = searchResult.rootEstimate
-        val chordInterval = searchResult.chordInterval
+        val searchResult = findAllRootIntervals(aVal, bVal, maxXForSearch)
+        val rootEstimates = searchResult.rootEstimates
+        val chordIntervals = searchResult.chordIntervals
 
-        if (rootEstimate == null || chordInterval == null) {
+        if (rootEstimates.isEmpty() || chordIntervals.isEmpty()) {
             callback(null, "Не удалось найти корни на интервале [0, ${"%.2f".format(maxXForSearch)}]")
             return
         }
 
-        // Вычисление корней
-        val chordResult = chordMethod(chordInterval.first, chordInterval.second, aVal, bVal)
-        val newtonResult = newtonMethod(rootEstimate, aVal, bVal)
+        // Вычисление всех корней
+        val chordResults = mutableListOf<Double>()
+        val newtonResults = mutableListOf<Double>()
+        val chordIterCounts = mutableListOf<Int>()
+        val newtonIterCounts = mutableListOf<Int>()
+        val fValuesChord = mutableListOf<Double?>()
+        val fValuesNewton = mutableListOf<Double?>()
+        val rootsTooClose = mutableListOf<Boolean>()
+        val rootDifferences = mutableListOf<Double>()
 
-        if (chordResult.first == null || newtonResult.first == null) {
-            callback(null, "Ошибка в вычислении корней")
-            return
+        for (i in chordIntervals.indices) {
+            val chordResult = chordMethod(chordIntervals[i].first, chordIntervals[i].second, aVal, bVal)
+            val newtonResult = newtonMethod(rootEstimates[i], aVal, bVal)
+
+            chordResult.first?.let { chordRoot ->
+                chordResults.add(chordRoot)
+                chordIterCounts.add(chordResult.second)
+                fValuesChord.add(f(chordRoot, aVal, bVal))
+
+                newtonResult.first?.let { newtonRoot ->
+                    // ВЫЧИСЛЯЕМ РАЗНИЦУ И ФЛАГ БЛИЗОСТИ ДЛЯ КАЖДОЙ ПАРЫ КОРНЕЙ
+                    val diff = abs(chordRoot - newtonRoot)
+                    rootDifferences.add(diff)
+                    rootsTooClose.add(diff < 0.001)
+                }
+            }
+
+            newtonResult.first?.let {
+                newtonResults.add(it)
+                newtonIterCounts.add(newtonResult.second)
+                fValuesNewton.add(f(it, aVal, bVal))
+            }
         }
 
-        // Расчет значений функций в найденных корнях
-        val fValueChord = f(chordResult.first!!, aVal, bVal)
-        val fValueNewton = f(newtonResult.first!!, aVal, bVal)
+        // Собираем все корни для отображения с объединением близких корней
+        val tolerance = 0.001
+        val allRoots = mutableListOf<Double>()
+        val sortedRoots = (chordResults + newtonResults).sorted()
 
-        // Проверка близости корней
-        val rootDifference = abs(chordResult.first!! - newtonResult.first!!)
-        val rootsTooClose = rootDifference < 0.001
+        if (sortedRoots.isNotEmpty()) {
+            var currentCluster = mutableListOf(sortedRoots[0])
+
+            for (i in 1 until sortedRoots.size) {
+                if (sortedRoots[i] - currentCluster.first() <= tolerance) {
+                    currentCluster.add(sortedRoots[i])
+                } else {
+                    // Добавляем среднее значение кластера
+                    allRoots.add(currentCluster.average())
+                    currentCluster = mutableListOf(sortedRoots[i])
+                }
+            }
+            // Добавляем последний кластер
+            allRoots.add(currentCluster.average())
+        }
 
         // Построение графиков
         val fullPlot = createPlot(
             searchResult.coarseData,
-            chordResult.first,
-            newtonResult.first,
+            chordResults,
+            newtonResults,
             aVal,
             bVal,
             "f(x) = √(${aVal}x) - cos(${bVal}x) (общий вид)",
-            chordInterval,
-            rootEstimate
+            chordIntervals,
+            rootEstimates
         )
 
         val zoomedPlot = createZoomedPlot(
-            chordResult.first!!,
-            newtonResult.first!!,
+            allRoots,
             aVal,
             bVal,
-            chordResult.first,
-            newtonResult.first,
-            chordInterval,
-            rootEstimate
+            chordResults,
+            newtonResults,
+            chordIntervals,
+            rootEstimates
         )
 
         // Возврат результатов
         callback(RootResult(
-            chordRoot = chordResult.first,
-            newtonRoot = newtonResult.first,
-            chordIterations = chordResult.second,
-            newtonIterations = newtonResult.second,
-            chordInterval = chordInterval,
-            newtonInitial = rootEstimate,
+            chordRoots = chordResults,
+            newtonRoots = newtonResults,
+            chordIterations = chordIterCounts,
+            newtonIterations = newtonIterCounts,
+            chordIntervals = chordIntervals,
+            newtonInitials = rootEstimates,
             fullPlot = fullPlot,
             zoomedPlot = zoomedPlot,
-            fValueChord = fValueChord,
-            fValueNewton = fValueNewton,
+            fValuesChord = fValuesChord,
+            fValuesNewton = fValuesNewton,
+            allRoots = allRoots,
             rootsTooClose = rootsTooClose,
-            rootDifference = rootDifference
+            rootDifferences = rootDifferences
         ), "")
     } catch (e: Exception) {
         callback(null, "Произошла ошибка: ${e.message}")
     }
 }
 
-// Поиск интервала с корнем
-private fun findRootInterval(
+// Поиск ВСЕХ интервалов с корнями
+private fun findAllRootIntervals(
     aVal: Double,
     bVal: Double,
     maxX: Double
@@ -127,51 +166,47 @@ private fun findRootInterval(
     val points = 1000
     val xValues = mutableListOf<Double>()
     val yValues = mutableListOf<Double>()
-    var rootEstimate: Double? = null
-    var chordInterval: Pair<Double, Double>? = null
+    val rootEstimates = mutableListOf<Double>()
+    val chordIntervals = mutableListOf<Pair<Double, Double>>()
 
-    // Сначала собираем все точки
-    for (i in 0 until points) {
+    // Собираем точки функции
+    for (i in 0..points) {
         val x = i * maxX / points
-        val y = Equation.f(x, aVal, bVal)
+        val y = f(x, aVal, bVal)
         if (y != null) {
             xValues.add(x)
             yValues.add(y)
         }
     }
 
-    if (xValues.isEmpty()) {
-        return SearchResult(
-            coarseData = emptyMap(),
-            rootEstimate = null,
-            chordInterval = null
-        )
-    }
-
-    // Затем ищем первый интервал смены знака
+    // Ищем ВСЕ интервалы смены знака
     for (i in 1 until xValues.size) {
         val y1 = yValues[i-1]
         val y2 = yValues[i]
+
         if (y1 * y2 <= 0) {
-            rootEstimate = (xValues[i-1] + xValues[i]) / 2
-            chordInterval = xValues[i-1] to xValues[i]
-            break
+            val estimate = (xValues[i-1] + xValues[i]) / 2
+            val interval = xValues[i-1] to xValues[i]
+
+            rootEstimates.add(estimate)
+            chordIntervals.add(interval)
         }
     }
 
     return SearchResult(
         coarseData = mapOf("x" to xValues, "y" to yValues),
-        rootEstimate = rootEstimate,
-        chordInterval = chordInterval
+        rootEstimates = rootEstimates,
+        chordIntervals = chordIntervals
     )
 }
 
-// Результат поиска интервала
+// Обновленная структура результата поиска
 private data class SearchResult(
     val coarseData: Map<String, List<Double>>,
-    val rootEstimate: Double?,
-    val chordInterval: Pair<Double, Double>?
+    val rootEstimates: List<Double>,              // Множество оценок корней
+    val chordIntervals: List<Pair<Double, Double>> // Множество интервалов
 )
+
 
 // Метод хорд (с исправлением области видимости переменных)
 fun chordMethod(
@@ -255,18 +290,21 @@ fun newtonMethod(
         x to iterations else null to 0
 }
 
-// Создание увеличенного графика
+// Создание увеличенного графика (обновленная)
 private fun createZoomedPlot(
-    minRoot: Double,
-    maxRoot: Double,
+    allRoots: List<Double>,           // Все корни
     aVal: Double,
     bVal: Double,
-    chordRoot: Double?,
-    newtonRoot: Double?,
-    chordInterval: Pair<Double, Double>?,
-    newtonInitial: Double?
+    chordRoots: List<Double>,
+    newtonRoots: List<Double>,
+    chordIntervals: List<Pair<Double, Double>>?,
+    newtonInitials: List<Double>?
 ): Figure? {
-    val padding = if (minRoot > 0.1) 0.1 else min(0.05, minRoot * 0.5)
+    if (allRoots.isEmpty()) return null
+
+    val padding = 0.1
+    val minRoot = allRoots.minOrNull() ?: 0.0
+    val maxRoot = allRoots.maxOrNull() ?: 0.0
     val viewMinX = max(0.0, minRoot - padding)
     val viewMaxX = maxRoot + padding
 
@@ -285,12 +323,12 @@ private fun createZoomedPlot(
 
     return createPlot(
         data = mapOf("x" to xValues, "y" to yValues),
-        chordRoot = chordRoot,
-        newtonRoot = newtonRoot,
+        chordRoots = chordRoots,
+        newtonRoots = newtonRoots,
         aVal = aVal,
         bVal = bVal,
         title = "f(x) = √(${aVal}x) - cos(${bVal}x) (увеличенный вид)",
-        chordInterval = chordInterval,
-        newtonInitial = newtonInitial
+        chordIntervals = chordIntervals,
+        newtonInitials = newtonInitials
     )
 }

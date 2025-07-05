@@ -34,13 +34,13 @@ object Plotter {
 
     fun createPlot(
         data: Map<String, List<Double>>,
-        chordRoot: Double?,
-        newtonRoot: Double?,
+        chordRoots: List<Double>,         // Все корни методом хорд
+        newtonRoots: List<Double>,        // Все корни методом Ньютона
         aVal: Double,
         bVal: Double,
         title: String,
-        chordInterval: Pair<Double, Double>?,
-        newtonInitial: Double?
+        chordIntervals: List<Pair<Double, Double>>?, // Все интервалы
+        newtonInitials: List<Double>?     // Все начальные приближения
     ): Figure {
         // Базовый график
         var plot = ggplot(data) +
@@ -54,53 +54,47 @@ object Plotter {
                 scaleXContinuous(name = "Ось X") +
                 scaleYContinuous(name = "Ось Y")
 
-        // Интервал метода хорд
-        chordInterval?.let { (left, right) ->
+        // Все интервалы метода хорд
+        chordIntervals?.forEach { interval ->
             plot = plot +
-                    geomVLine(xintercept = left, color = "#FFA000", linetype = "dashed", size = 1.0) +
-                    geomVLine(xintercept = right, color = "#FFA000", linetype = "dashed", size = 1.0)
+                    geomVLine(xintercept = interval.first, color = "#FFA000", linetype = "dashed", size = 0.7) +
+                    geomVLine(xintercept = interval.second, color = "#FFA000", linetype = "dashed", size = 0.7)
         }
 
         // Точки корней
-        val rootPoints = mutableListOf<Pair<Double, Double>>()
-        val rootLabels = mutableListOf<String>()
+        val rootPoints = mutableListOf<Triple<Double, Double, String>>()
         val rootColors = mutableListOf<String>()
 
-        chordRoot?.let { root ->
+        // Корни методом хорд
+        chordRoots.forEach { root ->
             Equation.f(root, aVal, bVal)?.let { y ->
-                rootPoints.add(root to y)
-                rootLabels.add("Метод хорд")
+                rootPoints.add(Triple(root, y, "Метод хорд"))
                 rootColors.add("red")
             }
         }
 
-        newtonRoot?.let { root ->
+        // Корни методом Ньютона
+        newtonRoots.forEach { root ->
             Equation.f(root, aVal, bVal)?.let { y ->
-                rootPoints.add(root to y)
-                rootLabels.add("Метод Ньютона")
+                rootPoints.add(Triple(root, y, "Метод Ньютона"))
                 rootColors.add("#00CC33")
             }
         }
-
-        // Настройки отображения для близких корней
-        val rootsAreClose = chordRoot != null && newtonRoot != null && abs(chordRoot - newtonRoot) < 0.001
-        val pointSize = if (rootsAreClose) 6.0 else 4.5
-        val pointAlpha = if (rootsAreClose) 0.5 else 1.0
 
         // Добавление точек на график
         if (rootPoints.isNotEmpty()) {
             val pointsData = mapOf(
                 "x" to rootPoints.map { it.first },
                 "y" to rootPoints.map { it.second },
-                "method" to rootLabels,
+                "method" to rootPoints.map { it.third },
                 "color" to rootColors
             )
 
             plot = plot +
                     geomPoint(
                         data = pointsData,
-                        size = pointSize,
-                        alpha = pointAlpha
+                        size = 5.0,
+                        alpha = 0.8
                     ) {
                         x = "x"
                         y = "y"
@@ -115,4 +109,5 @@ object Plotter {
 
         return plot + ggsize(800, 500)
     }
+
 }
