@@ -8,7 +8,7 @@ import kotlin.math.*
 import gladkikh.semen.task6.ui.Plotter.createPlot
 import org.jetbrains.letsPlot.Figure
 
-// Обновленная структура результатов
+// Структура результатов
 data class RootResult(
     val chordRoots: List<Double>,          // Все корни методом хорд
     val newtonRoots: List<Double>,         // Все корни методом Ньютона
@@ -22,16 +22,18 @@ data class RootResult(
     val fValuesNewton: List<Double?>,
     val allRoots: List<Double>,             // Все найденные корни
     val rootsTooClose: List<Boolean>,
-    val rootDifferences: List<Double>
+    val rootDifferences: List<Double>,
+    val warning: String = "",
 )
 
-// Основная функция вычисления корней (обновленная)
+// Основная функция вычисления корней
 fun computeRoots(
     a: String,
     b: String,
     callback: (RootResult?, String) -> Unit
 ) {
     try {
+        // Нормализация ввода (замена запятых на точки)
         val normalizedA = a.replace(',', '.')
         val normalizedB = b.replace(',', '.')
         val aVal = normalizedA.toDoubleOrNull()
@@ -43,19 +45,33 @@ fun computeRoots(
             return
         }
 
-        if (aVal <= 0) {
-            callback(null, "Ошибка: параметр 'a' должен быть положительным")
-            return
+        // Определение максимального интервала поиска
+        val maxXForSearch = min(10.0 * PI / abs(bVal), 100.0)
+        val warningMessage = if (aVal == 0.0) {
+            "При a=0 уравнение имеет вид -cos(bx)=0, что имеет бесконечно много корней. " +
+                    "Показаны корни на ограниченном интервале."
+        } else {
+            ""
         }
 
-        // Поиск ВСЕХ интервалов с корнями
-        val maxXForSearch = min(10.0 * PI / abs(bVal), 100.0)
-        val searchResult = findAllRootIntervals(aVal, bVal, maxXForSearch)
+        // Поиск интервалов с корнями (разные стратегии для a=0 и a≠0)
+        val searchResult = if (aVal == 0.0) {
+            // Для a=0 ищем корни на симметричном интервале [-maxX, maxX]
+            findAllRootIntervals(aVal, bVal, maxXForSearch, searchNegative = true)
+        } else {
+            // Для a≠0 выбираем интервал в зависимости от знака a
+            findAllRootIntervals(aVal, bVal, maxXForSearch, searchNegative = aVal < 0)
+        }
+
         val rootEstimates = searchResult.rootEstimates
         val chordIntervals = searchResult.chordIntervals
 
         if (rootEstimates.isEmpty() || chordIntervals.isEmpty()) {
-            callback(null, "Не удалось найти корни на интервале [0, ${"%.2f".format(maxXForSearch)}]")
+            val range = if (aVal < 0) "[-${"%.2f".format(maxXForSearch)}, 0]"
+            else if (aVal > 0) "[0, ${"%.2f".format(maxXForSearch)}]"
+            else "[-${"%.2f".format(maxXForSearch)}, ${"%.2f".format(maxXForSearch)}]"
+
+            callback(null, "Не удалось найти корни на интервале $range")
             return
         }
 
@@ -70,47 +86,58 @@ fun computeRoots(
         val rootDifferences = mutableListOf<Double>()
 
         for (i in chordIntervals.indices) {
-            val chordResult = chordMethod(chordIntervals[i].first, chordIntervals[i].second, aVal, bVal)
-            val newtonResult = newtonMethod(rootEstimates[i], aVal, bVal)
+            // Вычисление корня методом хорд
+            val chordResult = chordMethod(
+                chordIntervals[i].first,
+                chordIntervals[i].second,
+                aVal,
+                bVal
+            )
 
+            // Вычисление корня методом Ньютона
+            val newtonResult = newtonMethod(
+                rootEstimates[i],
+                aVal,
+                bVal
+            )
+
+            // Обработка результатов метода хорд
             chordResult.first?.let { chordRoot ->
                 chordResults.add(chordRoot)
                 chordIterCounts.add(chordResult.second)
-                fValuesChord.add(f(chordRoot, aVal, bVal))
+                fValuesChord.add(Equation.f(chordRoot, aVal, bVal))
 
+                // Сравнение с методом Ньютона
                 newtonResult.first?.let { newtonRoot ->
-                    // ВЫЧИСЛЯЕМ РАЗНИЦУ И ФЛАГ БЛИЗОСТИ ДЛЯ КАЖДОЙ ПАРЫ КОРНЕЙ
                     val diff = abs(chordRoot - newtonRoot)
                     rootDifferences.add(diff)
                     rootsTooClose.add(diff < 0.001)
                 }
             }
 
+            // Обработка результатов метода Ньютона
             newtonResult.first?.let {
                 newtonResults.add(it)
                 newtonIterCounts.add(newtonResult.second)
-                fValuesNewton.add(f(it, aVal, bVal))
+                fValuesNewton.add(Equation.f(it, aVal, bVal))
             }
         }
 
-        // Собираем все корни для отображения с объединением близких корней
+        // Объединение близких корней
         val tolerance = 0.001
         val allRoots = mutableListOf<Double>()
         val sortedRoots = (chordResults + newtonResults).sorted()
 
         if (sortedRoots.isNotEmpty()) {
             var currentCluster = mutableListOf(sortedRoots[0])
-
             for (i in 1 until sortedRoots.size) {
                 if (sortedRoots[i] - currentCluster.first() <= tolerance) {
                     currentCluster.add(sortedRoots[i])
                 } else {
-                    // Добавляем среднее значение кластера
                     allRoots.add(currentCluster.average())
                     currentCluster = mutableListOf(sortedRoots[i])
                 }
             }
-            // Добавляем последний кластер
             allRoots.add(currentCluster.average())
         }
 
@@ -121,7 +148,7 @@ fun computeRoots(
             newtonResults,
             aVal,
             bVal,
-            "f(x) = √(${aVal}x) - cos(${bVal}x) (общий вид)",
+            "f(x) = ${if (aVal >= 0) "√(${aVal}x)" else "√(${aVal}x)"} - cos(${bVal}x) (общий вид)",
             chordIntervals,
             rootEstimates
         )
@@ -150,36 +177,42 @@ fun computeRoots(
             fValuesNewton = fValuesNewton,
             allRoots = allRoots,
             rootsTooClose = rootsTooClose,
-            rootDifferences = rootDifferences
+            rootDifferences = rootDifferences,
+            warning = warningMessage
         ), "")
     } catch (e: Exception) {
         callback(null, "Произошла ошибка: ${e.message}")
     }
 }
 
-// Поиск ВСЕХ интервалов с корнями
+// Обновленная функция поиска интервалов
 private fun findAllRootIntervals(
     aVal: Double,
     bVal: Double,
-    maxX: Double
+    maxX: Double,
+    searchNegative: Boolean = false
 ): SearchResult {
+    // Определение границ поиска
+    val minX = if (searchNegative) -maxX else 0.0
+    val actualMaxX = if (searchNegative) 0.0 else maxX
+
     val points = 1000
     val xValues = mutableListOf<Double>()
     val yValues = mutableListOf<Double>()
     val rootEstimates = mutableListOf<Double>()
     val chordIntervals = mutableListOf<Pair<Double, Double>>()
 
-    // Собираем точки функции
+    // Сбор точек функции
     for (i in 0..points) {
-        val x = i * maxX / points
-        val y = f(x, aVal, bVal)
+        val x = minX + i * (actualMaxX - minX) / points
+        val y = Equation.f(x, aVal, bVal)
         if (y != null) {
             xValues.add(x)
             yValues.add(y)
         }
     }
 
-    // Ищем ВСЕ интервалы смены знака
+    // Поиск интервалов смены знака
     for (i in 1 until xValues.size) {
         val y1 = yValues[i-1]
         val y2 = yValues[i]
@@ -262,7 +295,7 @@ fun newtonMethod(
     bVal: Double,
     eps: Double = 0.001
 ): Pair<Double?, Int> {
-    var x = max(x0, 1e-10)
+    var x = x0
     var iterations = 0
     val maxIterations = 1000
     var prevX = Double.MAX_VALUE
@@ -305,7 +338,7 @@ private fun createZoomedPlot(
     val padding = 0.1
     val minRoot = allRoots.minOrNull() ?: 0.0
     val maxRoot = allRoots.maxOrNull() ?: 0.0
-    val viewMinX = max(0.0, minRoot - padding)
+    val viewMinX = minRoot - padding
     val viewMaxX = maxRoot + padding
 
     val points = 500

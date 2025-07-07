@@ -54,6 +54,7 @@ object Plotter {
                 scaleXContinuous(name = "Ось X") +
                 scaleYContinuous(name = "Ось Y")
 
+
         // Все интервалы метода хорд
         chordIntervals?.forEach { interval ->
             plot = plot +

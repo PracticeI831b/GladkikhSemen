@@ -133,7 +133,7 @@ private fun InputPanel(
         OutlinedTextField(
             value = a,
             onValueChange = onAChanged,
-            label = { Text("Параметр a (положительное число)") },
+            label = { Text("Параметр a (любое число)") },
             modifier = Modifier.weight(1f),
             singleLine = true,
             placeholder = { Text("1.0 или 1,0") },
@@ -187,14 +187,23 @@ private fun ResultsCard(
         backgroundColor = MaterialTheme.colors.surface,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 300.dp) // Ограничиваем высоту
+            .heightIn(max = 300.dp)
     ) {
         val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .padding(16.dp)
-                .verticalScroll(scrollState) // Добавляем прокрутку
+                .verticalScroll(scrollState)
         ) {
+            // Показываем предупреждение если оно есть
+            if (rootResult.warning.isNotEmpty()) {
+                Text(
+                    text = rootResult.warning,
+                    color = Color.Red,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
             Text(
                 text = "Результаты вычислений:",
                 fontWeight = FontWeight.Bold,
